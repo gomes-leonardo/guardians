@@ -5,7 +5,11 @@ import { ReservationsService } from './services/reservations.service';
 import { Reservation, ReservationSchema } from './schemas/reservation.schema';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Reservation.name, schema: ReservationSchema }])],
+  imports: [
+    MongooseModule.forFeature([
+      { name: Reservation.name, schema: ReservationSchema },
+    ]),
+  ],
   controllers: [ReservationsController],
   providers: [ReservationsService],
   exports: [ReservationsService],

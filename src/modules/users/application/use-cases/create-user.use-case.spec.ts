@@ -46,7 +46,9 @@ describe('CreateUserUseCase', () => {
       new User(userDto.name, userDto.email, userDto.password, '1'),
     );
 
-    await expect(useCase.execute(userDto)).rejects.toThrow('User already exists');
+    await expect(useCase.execute(userDto)).rejects.toThrow(
+      'User already exists',
+    );
     expect(mockUserRepository.create).not.toHaveBeenCalled();
   });
 });

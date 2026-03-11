@@ -5,5 +5,7 @@ import { Vehicle, VehicleDocument } from '../schemas/vehicle.schema';
 
 @Injectable()
 export class VehiclesService {
-  constructor(@InjectModel(Vehicle.name) private vehicleModel: Model<VehicleDocument>) {}
+  constructor(
+    @InjectModel(Vehicle.name) private vehicleModel: Model<VehicleDocument>,
+  ) {}
 }
