@@ -21,10 +21,17 @@ async function bootstrap() {
 
   // Swagger Configuration
   const config = new DocumentBuilder()
-    .setTitle('Vehicle Reservation API')
-    .setDescription('The vehicle reservation API description')
+    .setTitle('Guardians API')
+    .setDescription(
+      'API para gerenciamento de reservas de veículos. ' +
+        'Permite cadastro de usuários, veículos e controle de reservas.',
+    )
     .setVersion('1.0')
     .addBearerAuth()
+    .addTag('users', 'Gerenciamento de usuários')
+    .addTag('vehicles', 'Gerenciamento de veículos')
+    .addTag('reservations', 'Gerenciamento de reservas')
+    .addTag('auth', 'Autenticação')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -33,5 +40,6 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
+  console.log(`Swagger docs available at: http://localhost:${port}/api-docs`);
 }
 void bootstrap();
