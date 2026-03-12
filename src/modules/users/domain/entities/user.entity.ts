@@ -13,5 +13,24 @@ export class User {
   private validate() {
     if (!this.name) throw new Error('User name is required');
     if (!this.email) throw new Error('User email is required');
+    if (!User.isValidEmail(this.email)) {
+      throw new Error('Invalid email format');
+    }
+    if (this.password !== undefined && !User.isStrongPassword(this.password)) {
+      throw new Error(
+        'Password must be at least 8 characters with at least 1 letter and 1 number',
+      );
+    }
+  }
+
+  static isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  static isStrongPassword(password: string): boolean {
+    return (
+      password.length >= 8 && /[a-zA-Z]/.test(password) && /\d/.test(password)
+    );
   }
 }
