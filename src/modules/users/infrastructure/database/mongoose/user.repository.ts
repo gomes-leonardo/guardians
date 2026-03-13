@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { IUserRepository } from '../../../domain/repositories/user.repository.interface';
@@ -19,6 +19,7 @@ function toEntity(doc: UserDocument): UserEntity {
     (doc._id as { toString(): string }).toString(),
     ts.createdAt,
     ts.updatedAt,
+    doc.isActive,
   );
 }
 
@@ -42,14 +43,40 @@ export class MongooseUserRepository implements IUserRepository {
   }
 
   async findByEmail(email: string): Promise<UserEntity | null> {
-    const user = await this.userModel.findOne({ email }).exec();
+    const user = await this.userModel.findOne({ email, isActive: true }).exec();
     if (!user) return null;
     return toEntity(user);
   }
 
   async findById(id: string): Promise<UserEntity | null> {
     const user = await this.userModel.findById(id).exec();
-    if (!user) return null;
+    if (!user || !user.isActive) return null;
     return toEntity(user);
+  }
+
+  async update(
+    id: string,
+    data: Partial<{ name: string; password: string }>,
+  ): Promise<UserEntity | null> {
+    const updated = await this.userModel
+      .findOneAndUpdate({ _id: id, isActive: true }, data, { new: true })
+      .exec();
+    if (!updated) return null;
+    return new UserEntity(
+      updated.name,
+      updated.email,
+      undefined,
+      (updated._id as { toString(): string }).toString(),
+      (updated as unknown as TimestampedDoc).createdAt,
+      (updated as unknown as TimestampedDoc).updatedAt,
+      updated.isActive,
+    );
+  }
+
+  async softDelete(id: string): Promise<void> {
+    const result = await this.userModel
+      .findOneAndUpdate({ _id: id, isActive: true }, { isActive: false })
+      .exec();
+    if (!result) throw new NotFoundException('User not found');
   }
 }

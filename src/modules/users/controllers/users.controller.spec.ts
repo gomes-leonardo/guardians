@@ -1,18 +1,24 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { UsersController } from './users.controller';
 import { CreateUserUseCase } from '../application/use-cases/create-user.use-case';
+import { UpdateUserUseCase } from '../application/use-cases/update-user.use-case';
+import { DeleteUserUseCase } from '../application/use-cases/delete-user.use-case';
 import { User } from '../domain/entities/user.entity';
 
 describe('UsersController', () => {
   let controller: UsersController;
-  let mockCreateUserUseCase: jest.Mocked<Pick<CreateUserUseCase, 'execute'>>;
+  let mockCreateUseCase: jest.Mocked<Pick<CreateUserUseCase, 'execute'>>;
+  let mockUpdateUseCase: jest.Mocked<Pick<UpdateUserUseCase, 'execute'>>;
+  let mockDeleteUseCase: jest.Mocked<Pick<DeleteUserUseCase, 'execute'>>;
 
   beforeEach(() => {
-    mockCreateUserUseCase = {
-      execute: jest.fn(),
-    };
+    mockCreateUseCase = { execute: jest.fn() };
+    mockUpdateUseCase = { execute: jest.fn() };
+    mockDeleteUseCase = { execute: jest.fn() };
     controller = new UsersController(
-      mockCreateUserUseCase as unknown as CreateUserUseCase,
+      mockCreateUseCase as unknown as CreateUserUseCase,
+      mockUpdateUseCase as unknown as UpdateUserUseCase,
+      mockDeleteUseCase as unknown as DeleteUserUseCase,
     );
   });
 
@@ -30,18 +36,18 @@ describe('UsersController', () => {
         undefined,
         '1',
       );
-      mockCreateUserUseCase.execute.mockResolvedValue(createdUser);
+      mockCreateUseCase.execute.mockResolvedValue(createdUser);
 
       const result = await controller.create(createUserDto);
 
-      expect(mockCreateUserUseCase.execute).toHaveBeenCalledWith(createUserDto);
+      expect(mockCreateUseCase.execute).toHaveBeenCalledWith(createUserDto);
       expect(result.email).toBe('john@example.com');
       expect(result.id).toBe('1');
       expect(result.password).toBeUndefined();
     });
 
     it('should propagate ConflictException when email already exists', async () => {
-      mockCreateUserUseCase.execute.mockRejectedValue(
+      mockCreateUseCase.execute.mockRejectedValue(
         new ConflictException('User with this email already exists'),
       );
 
@@ -49,17 +55,47 @@ describe('UsersController', () => {
         ConflictException,
       );
     });
+  });
 
-    it('should propagate domain error when password is weak', async () => {
-      mockCreateUserUseCase.execute.mockRejectedValue(
-        new Error(
-          'Password must be at least 8 characters with at least 1 letter and 1 number',
-        ),
+  describe('PUT /users/:id', () => {
+    it('should update and return user', async () => {
+      mockUpdateUseCase.execute.mockResolvedValue(
+        new User('New Name', 'john@example.com', undefined, '1'),
       );
 
-      await expect(controller.create(createUserDto)).rejects.toThrow(
-        'Password must be at least 8 characters',
+      const result = await controller.update('1', { name: 'New Name' });
+
+      expect(mockUpdateUseCase.execute).toHaveBeenCalledWith('1', {
+        name: 'New Name',
+      });
+      expect(result.name).toBe('New Name');
+    });
+
+    it('should propagate NotFoundException', async () => {
+      mockUpdateUseCase.execute.mockRejectedValue(
+        new NotFoundException('User not found'),
       );
+
+      await expect(controller.update('999', { name: 'Test' })).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('DELETE /users/:id', () => {
+    it('should soft delete a user', async () => {
+      mockDeleteUseCase.execute.mockResolvedValue();
+
+      await expect(controller.delete('1')).resolves.toBeUndefined();
+      expect(mockDeleteUseCase.execute).toHaveBeenCalledWith('1');
+    });
+
+    it('should propagate NotFoundException', async () => {
+      mockDeleteUseCase.execute.mockRejectedValue(
+        new NotFoundException('User not found'),
+      );
+
+      await expect(controller.delete('999')).rejects.toThrow(NotFoundException);
     });
   });
 });

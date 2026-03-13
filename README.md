@@ -6,25 +6,21 @@ API para gerenciamento de reservas de veiculos construida com NestJS, MongoDB e 
 
 - **NestJS 11** - Framework Node.js
 - **MongoDB** (Mongoose 9) - Banco de dados
+- **Passport + JWT** - Autenticacao
 - **Swagger** - Documentacao interativa da API
 - **Docker / Docker Compose** - Ambiente de desenvolvimento
-- **GitHub Actions** - CI/CD (lint, testes, build)
+- **Jest** - Testes unitarios
 - **ESLint + Prettier** - Padronizacao de codigo
 
 ## Requisitos
 
 - Node.js 20+
-- Docker e Docker Compose (para desenvolvimento local)
+- Docker e Docker Compose
 
 ## Instalacao
 
 ```bash
 npm install
-```
-
-Copie o arquivo de variaveis de ambiente:
-
-```bash
 cp .env.example .env
 ```
 
@@ -32,16 +28,10 @@ cp .env.example .env
 
 ### Com Docker (recomendado)
 
-Sobe o MongoDB e roda o servidor com hot-reload:
+Sobe o MongoDB e a API com hot-reload:
 
 ```bash
-npm run docker:dev
-```
-
-Ou sobe toda a stack (API + MongoDB) containerizada:
-
-```bash
-npm run docker:up
+docker-compose up
 ```
 
 ### Sem Docker
@@ -60,69 +50,117 @@ Com o servidor rodando, acesse:
 http://localhost:3000/api-docs
 ```
 
-A documentacao interativa permite testar todos os endpoints diretamente pelo navegador.
+## Endpoints
 
-## Scripts disponiveis
+### Auth
 
-| Script | Descricao |
-|---|---|
-| `npm run start:dev` | Servidor em modo desenvolvimento (hot-reload) |
-| `npm run build` | Compila o projeto |
-| `npm run start:prod` | Roda o build de producao |
-| `npm run test` | Roda testes unitarios |
-| `npm run test:cov` | Testes com relatorio de cobertura |
-| `npm run lint` | Roda ESLint com auto-fix |
-| `npm run lint:check` | Roda ESLint sem auto-fix (usado no CI) |
-| `npm run format` | Formata codigo com Prettier |
-| `npm run format:check` | Verifica formatacao (usado no CI) |
-| `npm run docker:dev` | Sobe MongoDB + servidor dev |
-| `npm run docker:up` | Sobe toda a stack Docker |
-| `npm run docker:down` | Para os containers |
-| `npm run docker:test` | Sobe MongoDB + roda testes |
+| Metodo | Rota | Autenticado | Descricao |
+|---|---|---|---|
+| POST | `/auth/login` | Nao | Login e obtencao do token JWT |
 
-## Estrutura do projeto
+### Usuarios
+
+| Metodo | Rota | Autenticado | Descricao |
+|---|---|---|---|
+| POST | `/users` | Nao | Cadastro de usuario |
+| PUT | `/users/:id` | Sim | Edicao de usuario |
+| DELETE | `/users/:id` | Sim | Remocao de usuario (soft delete) |
+
+### Veiculos
+
+| Metodo | Rota | Autenticado | Descricao |
+|---|---|---|---|
+| GET | `/vehicles` | Nao | Listagem de veiculos |
+| GET | `/vehicles/:id` | Nao | Detalhes de um veiculo |
+| POST | `/vehicles` | Sim | Cadastro de veiculo |
+| PUT | `/vehicles/:id` | Sim | Edicao de veiculo |
+| DELETE | `/vehicles/:id` | Sim | Remocao de veiculo |
+
+### Reservas
+
+| Metodo | Rota | Autenticado | Descricao |
+|---|---|---|---|
+| POST | `/reservations` | Sim | Reservar um veiculo (envia apenas vehicleId) |
+| PATCH | `/reservations/:id/release` | Sim | Liberar/finalizar uma reserva |
+| GET | `/reservations/my` | Sim | Listar reservas do usuario logado |
+
+## Regras de negocio
+
+- Todas as rotas sao protegidas por JWT, exceto login e cadastro de usuario
+- Um veiculo nao pode ser reservado se ja estiver reservado por outro usuario
+- Um usuario nao pode ter mais de um veiculo reservado simultaneamente
+- O userId da reserva e extraido automaticamente do token JWT
+- Apenas o dono da reserva pode libera-la
+- A remocao de usuarios e feita via soft delete (campo `isActive`)
+
+## Arquitetura
+
+O projeto segue os principios de DDD (Domain-Driven Design) e Clean Architecture:
 
 ```
 src/
   common/
-    filters/              # Filtros globais (exception filter)
+    filters/                       # Filtros globais (exception filter)
   modules/
-    auth/                 # Autenticacao (em desenvolvimento)
-      controllers/
-      services/
-    users/                # Gerenciamento de usuarios
+    auth/
+      controllers/                 # AuthController (POST /auth/login)
+      decorators/                  # @Public() decorator
+      dto/                         # LoginDto
+      guards/                      # JwtAuthGuard (global)
+      services/                    # AuthService (validate + JWT sign)
+      strategies/                  # JwtStrategy (Passport)
+    users/
       application/
-        dto/              # Data Transfer Objects
-        use-cases/        # Casos de uso (logica de negocio)
-      controllers/
+        dto/                       # CreateUserDto, UpdateUserDto
+        use-cases/                 # CreateUser, UpdateUser, DeleteUser
+      controllers/                 # UsersController
       domain/
-        entities/         # Entidades de dominio
-        repositories/     # Interfaces de repositorio
+        entities/                  # User entity (validacao de email/senha)
+        repositories/              # IUserRepository (interface)
       infrastructure/
-        database/
-          mongoose/       # Schemas do Mongoose
-      services/
-    vehicles/             # Gerenciamento de veiculos
-      controllers/
-      dto/
-      schemas/
-      services/
-    reservations/         # Gerenciamento de reservas
-      controllers/
-      dto/
-      schemas/
-      services/
+        database/mongoose/         # MongooseUserRepository, schema
+    vehicles/
+      controllers/                 # VehiclesController (CRUD)
+      domain/
+        entities/                  # VehicleEntity (validacao de ano)
+        repositories/              # IVehicleRepository (interface)
+      dto/                         # CreateVehicleDto, UpdateVehicleDto
+      infrastructure/
+        database/mongoose/         # MongooseVehicleRepository
+      schemas/                     # Mongoose schema
+      services/                    # VehiclesService
+    reservations/
+      application/
+        use-cases/                 # CreateReservation, ReleaseReservation
+      controllers/                 # ReservationsController
+      domain/
+        entities/                  # ReservationEntity (status, release)
+        repositories/              # IReservationRepository (interface)
+        services/                  # ReservationDomainService (regras)
+      dto/                         # CreateReservationDto
+      infrastructure/
+        database/mongoose/         # MongooseReservationRepository
+      schemas/                     # Mongoose schema
 ```
 
-## CI/CD
+## Testes
 
-O projeto usa GitHub Actions com o seguinte pipeline:
+```bash
+npm run test              # Roda testes unitarios
+npm run test:cov          # Testes com relatorio de cobertura
+```
 
-1. **Lint** - ESLint + verificacao de formatacao Prettier
-2. **Unit Tests** - Testes unitarios com cobertura
-3. **Build** - Compilacao do projeto
+## Scripts
 
-Todos os checks sao obrigatorios para merge na branch `main`.
+| Script | Descricao |
+|---|---|
+| `npm run start:dev` | Servidor com hot-reload |
+| `npm run build` | Compila o projeto |
+| `npm run start:prod` | Roda o build de producao |
+| `npm run test` | Testes unitarios |
+| `npm run test:cov` | Testes com cobertura |
+| `npm run lint` | ESLint com auto-fix |
+| `npm run format` | Formata com Prettier |
 
 ## Variaveis de ambiente
 

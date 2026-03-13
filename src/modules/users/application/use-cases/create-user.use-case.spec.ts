@@ -19,6 +19,8 @@ describe('CreateUserUseCase', () => {
       create: jest.fn(),
       findByEmail: jest.fn(),
       findById: jest.fn(),
+      update: jest.fn(),
+      softDelete: jest.fn(),
     };
     useCase = new CreateUserUseCase(mockUserRepository);
   });
