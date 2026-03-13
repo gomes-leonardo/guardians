@@ -6,6 +6,10 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import {
+  DomainException,
+  DomainErrorCode,
+} from '../exceptions/domain.exception';
 
 interface MongoError extends Error {
   code?: number;
@@ -50,6 +54,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return {
         status: HttpStatus.BAD_REQUEST,
         message: `Invalid ${exception.path ?? 'parameter'} format`,
+      };
+    }
+
+    if (exception instanceof DomainException) {
+      return {
+        status: this.mapDomainCode(exception.code),
+        message: exception.message,
       };
     }
 
@@ -113,5 +124,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
   private isCastError(exception: unknown): exception is CastError {
     return exception instanceof Error && exception.name === 'CastError';
+  }
+
+  private mapDomainCode(code: DomainErrorCode): number {
+    const map: Record<DomainErrorCode, number> = {
+      [DomainErrorCode.VALIDATION]: HttpStatus.BAD_REQUEST,
+      [DomainErrorCode.CONFLICT]: HttpStatus.CONFLICT,
+      [DomainErrorCode.NOT_FOUND]: HttpStatus.NOT_FOUND,
+    };
+    return map[code];
   }
 }

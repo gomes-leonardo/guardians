@@ -6,6 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { HttpExceptionFilter } from './http-exception.filter';
+import {
+  DomainException,
+  DomainErrorCode,
+} from '../exceptions/domain.exception';
 
 describe('HttpExceptionFilter', () => {
   let filter: HttpExceptionFilter;
@@ -135,6 +139,44 @@ describe('HttpExceptionFilter', () => {
 
       expect(result.statusCode).toBe(400);
       expect(result.message).toBe('Invalid _id format');
+    });
+  });
+
+  describe('DomainException handling', () => {
+    it('should map VALIDATION to 400', () => {
+      filter.catch(
+        new DomainException('Invalid email format', DomainErrorCode.VALIDATION),
+        mockHost as never,
+      );
+      const result = getResult();
+
+      expect(result.statusCode).toBe(400);
+      expect(result.message).toBe('Invalid email format');
+    });
+
+    it('should map CONFLICT to 409', () => {
+      filter.catch(
+        new DomainException(
+          'Vehicle is already reserved',
+          DomainErrorCode.CONFLICT,
+        ),
+        mockHost as never,
+      );
+      const result = getResult();
+
+      expect(result.statusCode).toBe(409);
+      expect(result.message).toBe('Vehicle is already reserved');
+    });
+
+    it('should map NOT_FOUND to 404', () => {
+      filter.catch(
+        new DomainException('Resource not found', DomainErrorCode.NOT_FOUND),
+        mockHost as never,
+      );
+      const result = getResult();
+
+      expect(result.statusCode).toBe(404);
+      expect(result.message).toBe('Resource not found');
     });
   });
 
