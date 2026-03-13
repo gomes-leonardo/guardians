@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import type { IReservationRepository } from '../repositories/reservation.repository.interface';
 
 export class ReservationDomainService {
@@ -6,7 +7,7 @@ export class ReservationDomainService {
   async ensureUserHasNoActiveReservation(userId: string): Promise<void> {
     const active = await this.reservationRepository.findActiveByUserId(userId);
     if (active) {
-      throw new Error('User already has an active reservation');
+      throw new ConflictException('User already has an active reservation');
     }
   }
 
@@ -14,7 +15,7 @@ export class ReservationDomainService {
     const active =
       await this.reservationRepository.findActiveByVehicleId(vehicleId);
     if (active) {
-      throw new Error('Vehicle is already reserved');
+      throw new ConflictException('Vehicle is already reserved');
     }
   }
 }

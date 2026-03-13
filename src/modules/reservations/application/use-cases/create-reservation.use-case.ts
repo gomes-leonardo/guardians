@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import type { IReservationRepository } from '../../domain/repositories/reservation.repository.interface';
 import type { IUserRepository } from '../../../users/domain/repositories/user.repository.interface';
 import type { IVehicleRepository } from '../../../vehicles/domain/repositories/vehicle.repository.interface';
@@ -26,14 +26,7 @@ export class CreateReservationUseCase {
     await this.domainService.ensureUserHasNoActiveReservation(userId);
     await this.domainService.ensureVehicleIsAvailable(vehicleId);
 
-    try {
-      const reservation = new ReservationEntity(userId, vehicleId);
-      return await this.reservationRepository.create(reservation);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new BadRequestException(error.message);
-      }
-      throw error;
-    }
+    const reservation = new ReservationEntity(userId, vehicleId);
+    return this.reservationRepository.create(reservation);
   }
 }
