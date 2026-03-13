@@ -8,8 +8,9 @@ API para gerenciamento de reservas de veiculos construida com NestJS, MongoDB e 
 - **MongoDB** (Mongoose 9) - Banco de dados
 - **Passport + JWT** - Autenticacao
 - **Swagger** - Documentacao interativa da API
-- **Docker / Docker Compose** - Ambiente de desenvolvimento
-- **Jest** - Testes unitarios
+- **Docker / Docker Compose** - Ambiente containerizado
+- **GitHub Actions** - CI/CD (lint, testes, build)
+- **Jest** - Testes unitarios (91 testes, 18 suites)
 - **ESLint + Prettier** - Padronizacao de codigo
 
 ## Requisitos
@@ -42,6 +43,8 @@ Necessario ter um MongoDB rodando localmente na porta 27017.
 npm run start:dev
 ```
 
+A aplicacao estara disponivel em `http://localhost:3000`.
+
 ## Documentacao da API (Swagger)
 
 Com o servidor rodando, acesse:
@@ -49,6 +52,8 @@ Com o servidor rodando, acesse:
 ```
 http://localhost:3000/api-docs
 ```
+
+A documentacao interativa permite testar todos os endpoints diretamente pelo navegador, incluindo autenticacao via token JWT.
 
 ## Endpoints
 
@@ -63,14 +68,14 @@ http://localhost:3000/api-docs
 | Metodo | Rota | Autenticado | Descricao |
 |---|---|---|---|
 | POST | `/users` | Nao | Cadastro de usuario |
-| PUT | `/users/:id` | Sim | Edicao de usuario |
+| PUT | `/users/:id` | Sim | Edicao de usuario (nome e/ou senha) |
 | DELETE | `/users/:id` | Sim | Remocao de usuario (soft delete) |
 
 ### Veiculos
 
 | Metodo | Rota | Autenticado | Descricao |
 |---|---|---|---|
-| GET | `/vehicles` | Nao | Listagem de veiculos |
+| GET | `/vehicles` | Nao | Listagem de veiculos cadastrados |
 | GET | `/vehicles/:id` | Nao | Detalhes de um veiculo |
 | POST | `/vehicles` | Sim | Cadastro de veiculo |
 | PUT | `/vehicles/:id` | Sim | Edicao de veiculo |
@@ -80,30 +85,45 @@ http://localhost:3000/api-docs
 
 | Metodo | Rota | Autenticado | Descricao |
 |---|---|---|---|
-| POST | `/reservations` | Sim | Reservar um veiculo (envia apenas vehicleId) |
+| POST | `/reservations` | Sim | Reservar um veiculo (envia apenas o vehicleId) |
 | PATCH | `/reservations/:id/release` | Sim | Liberar/finalizar uma reserva |
 | GET | `/reservations/my` | Sim | Listar reservas do usuario logado |
 
 ## Regras de negocio
 
 - Todas as rotas sao protegidas por JWT, exceto login e cadastro de usuario
-- Um veiculo nao pode ser reservado se ja estiver reservado por outro usuario
+- Um veiculo nao pode ser reservado se ja estiver vinculado a uma reserva ativa
 - Um usuario nao pode ter mais de um veiculo reservado simultaneamente
-- O userId da reserva e extraido automaticamente do token JWT
+- O userId da reserva e extraido automaticamente do token JWT (nunca enviado pelo cliente)
 - Apenas o dono da reserva pode libera-la
-- A remocao de usuarios e feita via soft delete (campo `isActive`)
+- A remocao de usuarios e feita via soft delete (campo `isActive`), preservando integridade referencial
+- Senhas sao criptografadas com bcrypt antes de serem armazenadas
+- Entidades de dominio validam dados no construtor (fail-fast): email invalido, senha fraca ou ano de veiculo fora do intervalo permitido sao rejeitados antes de chegar ao banco
 
 ## Arquitetura
 
-O projeto segue os principios de DDD (Domain-Driven Design) e Clean Architecture:
+O projeto segue **DDD (Domain-Driven Design)** e **Clean Architecture**, com separacao clara em camadas:
+
+- **Domain**: Entidades com regras de negocio auto-validaveis, interfaces de repositorio e Domain Services para regras que envolvem multiplas entidades
+- **Application**: Use Cases que orquestram o fluxo (CreateUser, CreateReservation, etc.)
+- **Infrastructure**: Implementacoes concretas dos repositorios (Mongoose) — desacopladas do dominio via interfaces
+- **Web**: Controllers, DTOs com validacao via class-validator, e decorators de seguranca
+
+### Desacoplamento do banco de dados
+
+Os services e use cases dependem de **interfaces** de repositorio, nao da implementacao do Mongoose. A injecao e feita via factory providers no modulo. Isso permite trocar o banco de dados (ex: PostgreSQL, DynamoDB) criando uma nova implementacao da interface, sem alterar nenhuma logica de negocio.
+
+### Seguranca por padrao
+
+Um `JwtAuthGuard` global protege todas as rotas automaticamente. Rotas publicas sao explicitamente marcadas com o decorator `@Public()`. Isso garante que nenhuma rota nova fique acidentalmente exposta.
 
 ```
 src/
   common/
-    filters/                       # Filtros globais (exception filter)
+    filters/                       # HttpExceptionFilter global
   modules/
     auth/
-      controllers/                 # AuthController (POST /auth/login)
+      controllers/                 # POST /auth/login
       decorators/                  # @Public() decorator
       dto/                         # LoginDto
       guards/                      # JwtAuthGuard (global)
@@ -118,11 +138,11 @@ src/
         entities/                  # User entity (validacao de email/senha)
         repositories/              # IUserRepository (interface)
       infrastructure/
-        database/mongoose/         # MongooseUserRepository, schema
+        database/mongoose/         # MongooseUserRepository, UserSchema
     vehicles/
-      controllers/                 # VehiclesController (CRUD)
+      controllers/                 # VehiclesController (CRUD completo)
       domain/
-        entities/                  # VehicleEntity (validacao de ano)
+        entities/                  # VehicleEntity (validacao de ano: 1900 a atual+1)
         repositories/              # IVehicleRepository (interface)
       dto/                         # CreateVehicleDto, UpdateVehicleDto
       infrastructure/
@@ -134,10 +154,10 @@ src/
         use-cases/                 # CreateReservation, ReleaseReservation
       controllers/                 # ReservationsController
       domain/
-        entities/                  # ReservationEntity (status, release)
+        entities/                  # ReservationEntity (ACTIVE/FINISHED, release())
         repositories/              # IReservationRepository (interface)
-        services/                  # ReservationDomainService (regras)
-      dto/                         # CreateReservationDto
+        services/                  # ReservationDomainService (regras de disponibilidade)
+      dto/                         # CreateReservationDto (apenas vehicleId)
       infrastructure/
         database/mongoose/         # MongooseReservationRepository
       schemas/                     # Mongoose schema
@@ -145,10 +165,29 @@ src/
 
 ## Testes
 
+O projeto possui **91 testes unitarios** em **18 suites**, cobrindo todas as camadas:
+
+- **Entidades de dominio**: Validacao de campos, regras de negocio (email, senha, ano do veiculo, status da reserva)
+- **Domain Services**: Regras de disponibilidade (usuario com reserva ativa, veiculo ja reservado)
+- **Use Cases**: Fluxos de criacao, atualizacao e remocao com mocks dos repositorios
+- **Controllers**: Verificacao de rotas, propagacao de erros e integracao com use cases
+
+Os testes nao dependem de banco de dados nem de framework, rodando em menos de 2 segundos.
+
 ```bash
 npm run test              # Roda testes unitarios
 npm run test:cov          # Testes com relatorio de cobertura
 ```
+
+## CI/CD
+
+O projeto usa **GitHub Actions** com um pipeline de 3 etapas obrigatorias para merge na `main`:
+
+1. **Lint** - ESLint + verificacao de formatacao Prettier
+2. **Unit Tests** - Testes unitarios com cobertura (artefato gerado)
+3. **Build** - Compilacao TypeScript do projeto
+
+Os jobs rodam em sequencia: lint -> testes -> build. Se qualquer etapa falhar, o merge e bloqueado via branch protection rules.
 
 ## Scripts
 
