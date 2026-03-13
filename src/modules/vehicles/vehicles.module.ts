@@ -19,6 +19,6 @@ import { Vehicle, VehicleSchema } from './schemas/vehicle.schema';
       inject: [MongooseVehicleRepository],
     },
   ],
-  exports: [VehiclesService],
+  exports: [VehiclesService, MongooseVehicleRepository],
 })
 export class VehiclesModule {}
