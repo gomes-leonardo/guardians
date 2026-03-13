@@ -3,13 +3,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Document, Types } from 'mongoose';
 import { User } from '../../users/infrastructure/database/mongoose/user.schema';
 import { Vehicle } from '../../vehicles/schemas/vehicle.schema';
+import { ReservationStatus } from '../domain/entities/reservation.entity';
 
 export type ReservationDocument = Reservation & Document;
-
-export enum ReservationStatus {
-  ACTIVE = 'ACTIVE',
-  FINISHED = 'FINISHED',
-}
 
 @Schema({ timestamps: true })
 export class Reservation {
