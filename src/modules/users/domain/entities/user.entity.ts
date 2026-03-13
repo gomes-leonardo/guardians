@@ -1,3 +1,5 @@
+import { DomainException } from '../../../../common/exceptions/domain.exception';
+
 export class User {
   constructor(
     public readonly name: string,
@@ -12,13 +14,13 @@ export class User {
   }
 
   private validate() {
-    if (!this.name) throw new Error('User name is required');
-    if (!this.email) throw new Error('User email is required');
+    if (!this.name) throw new DomainException('User name is required');
+    if (!this.email) throw new DomainException('User email is required');
     if (!User.isValidEmail(this.email)) {
-      throw new Error('Invalid email format');
+      throw new DomainException('Invalid email format');
     }
     if (this.password !== undefined && !User.isStrongPassword(this.password)) {
-      throw new Error(
+      throw new DomainException(
         'Password must be at least 8 characters with at least 1 letter and 1 number',
       );
     }

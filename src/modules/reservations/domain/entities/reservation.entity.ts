@@ -1,3 +1,4 @@
+import { DomainException } from '../../../../common/exceptions/domain.exception';
 import { Types } from 'mongoose';
 
 export enum ReservationStatus {
@@ -18,20 +19,20 @@ export class ReservationEntity {
   }
 
   private validate() {
-    if (!this.userId) throw new Error('User ID is required');
-    if (!this.vehicleId) throw new Error('Vehicle ID is required');
+    if (!this.userId) throw new DomainException('User ID is required');
+    if (!this.vehicleId) throw new DomainException('Vehicle ID is required');
 
     if (!Types.ObjectId.isValid(this.userId)) {
-      throw new Error('User ID must be a valid ObjectId');
+      throw new DomainException('User ID must be a valid ObjectId');
     }
     if (!Types.ObjectId.isValid(this.vehicleId)) {
-      throw new Error('Vehicle ID must be a valid ObjectId');
+      throw new DomainException('Vehicle ID must be a valid ObjectId');
     }
   }
 
   release(): void {
     if (this.status === ReservationStatus.FINISHED) {
-      throw new Error('Reservation is already finished');
+      throw new DomainException('Reservation is already finished');
     }
     this.status = ReservationStatus.FINISHED;
   }
