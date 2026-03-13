@@ -6,6 +6,7 @@ export class User {
     public readonly id?: string,
     public readonly createdAt?: Date,
     public readonly updatedAt?: Date,
+    public readonly isActive: boolean = true,
   ) {
     this.validate();
   }
